@@ -1,20 +1,18 @@
 #!/bin/bash
 set -e
 
-LO_PORT=${LO_PORT:-2002}
-API_PORT=${API_PORT:-8080}
+export LO_PORT=${LO_PORT:-2002}
+export API_PORT=${API_PORT:-8080}
+export LOG_LEVEL=${LOG_LEVEL:-info}
 
-echo "Starting LibreOffice in headless mode on UNO port ${LO_PORT}..."
+echo "Starting LibreOffice via supervisord on UNO port ${LO_PORT}..."
 
-# Start LibreOffice with a disposable user profile
-soffice --headless --norestore --nologo \
-  --env:UserInstallation=file:///tmp/lo_user_profile \
-  --accept="socket,host=localhost,port=${LO_PORT};urp;StarOffice.ServiceManager" &
-
-LO_PID=$!
+# Start supervisord in background (manages LibreOffice process)
+supervisord -c /etc/supervisor/conf.d/lola.conf &
+SUPERVISORD_PID=$!
 
 # Wait for LibreOffice to be ready (up to 60 seconds)
-echo "Waiting for LibreOffice to accept connections..."
+echo "Waiting for LibreOffice UNO socket to be ready..."
 READY=false
 for i in $(seq 1 30); do
     if python3 -c "
@@ -41,5 +39,8 @@ fi
 
 echo "Starting Lola API service on port ${API_PORT}..."
 
-# Start FastAPI — exec replaces the shell so signals propagate
-exec uvicorn app.main:app --host 0.0.0.0 --port ${API_PORT} --log-level ${LOG_LEVEL:-info}
+# Tell supervisord to start uvicorn now that LibreOffice is ready
+supervisorctl -c /etc/supervisor/conf.d/lola.conf start uvicorn
+
+# Keep the container alive by waiting on supervisord
+wait $SUPERVISORD_PID
