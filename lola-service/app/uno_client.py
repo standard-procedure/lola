@@ -85,6 +85,38 @@ class UnoClient:
                     logger.error(f"UNO retry also failed: {retry_error}")
                     raise
 
+    def mail_merge(
+        self,
+        template_path: str,
+        data: list,
+        output_dir: str,
+        output_format: str = "pdf",
+    ) -> list:
+        """
+        Execute a mail merge via UNO.
+
+        Args:
+            template_path: Absolute path to .docx template.
+            data: List of dicts — each dict is one record.
+            output_dir: Absolute path to output directory.
+            output_format: "pdf", "docx", or "odt".
+
+        Returns:
+            List of absolute paths to output files.
+        """
+        from app.uno_mail_merge import mail_merge as _mail_merge
+
+        def _do(client):
+            return _mail_merge(
+                client.ctx,
+                template_path,
+                data,
+                output_dir,
+                output_format=output_format,
+            )
+
+        return self.execute_with_lock(_do)
+
     def convert_to_pdf(self, input_path: str, output_path: str, save_filter: str = "writer_pdf_Export") -> None:
         """
         Convert a document to the specified format using LibreOffice UNO.
