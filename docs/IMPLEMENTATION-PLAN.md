@@ -74,6 +74,9 @@ services:
       - API_PORT=8080
       - LOG_LEVEL=info
       - MAX_MERGE_TIMEOUT=120
+      - DOCUMENTS_PATH=/documents      # Shared volume mount path
+      - LIBREOFFICE_PORT=2002          # UNO socket port (alias for LO_PORT)
+      - SERVICE_PORT=8080              # FastAPI listen port (alias for API_PORT)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -82,6 +85,54 @@ services:
       start_period: 30s
     restart: unless-stopped
 ```
+
+---
+
+## supervisord Configuration
+
+supervisord manages both the LibreOffice UNO server and uvicorn, providing automatic restart on crash:
+
+```ini
+; lola-service/supervisord.conf
+[supervisord]
+nodaemon=true
+logfile=/dev/stdout
+logfile_maxbytes=0
+loglevel=info
+
+[program:libreoffice]
+command=soffice --headless --norestore --nologo
+    --env:UserInstallation=file:///tmp/lo_user_profile
+    --accept="socket,host=localhost,port=%(ENV_LO_PORT)s;urp;StarOffice.ServiceManager"
+autostart=true
+autorestart=true
+startsecs=10
+startretries=3
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+priority=100
+
+[program:uvicorn]
+command=uvicorn app.main:app --host 0.0.0.0 --port %(ENV_API_PORT)s --log-level %(ENV_LOG_LEVEL)s
+directory=/app
+autostart=true
+autorestart=true
+startsecs=5
+startretries=3
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+priority=200
+```
+
+**Key points:**
+- `priority=100` for LibreOffice means it starts first; uvicorn (`priority=200`) starts second
+- `autorestart=true` on both so supervisord restarts either if it crashes
+- The entrypoint.sh still waits for the UNO socket to be ready before supervisord starts uvicorn
+  (or use `startsecs` + the Python service's reconnect logic to tolerate a slow LO start)
 
 ---
 
@@ -204,14 +255,16 @@ lola-service/
 ### Key Dependencies
 
 ```
-# requirements.txt
-fastapi==0.115.*
-uvicorn[standard]==0.34.*
-pydantic==2.*
-python-multipart==0.0.*
+# requirements.txt (pinned versions)
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+pydantic>=2.0,<3.0
+python-multipart>=0.0.9
+python-docx>=1.1         # For XML-based merge field extraction (no LO needed)
+httpx>=0.27              # For pytest async test client
 ```
 
-Note: `uno` is NOT a pip package — it comes from `python3-uno` system package.
+Note: `uno` is NOT a pip package — it comes from `python3-uno` system package on Ubuntu (`apt-get install python3-uno`).
 
 ### Core Modules
 

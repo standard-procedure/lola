@@ -227,6 +227,7 @@ Execute a mail merge: populate a template with data records and produce output f
 | `output_dir` | string | ✅ | — | Directory for output files (relative to /documents). Created if it doesn't exist. |
 | `output_format` | string | ❌ | `"pdf"` | Output format: `"pdf"`, `"docx"`, `"odt"` |
 | `filename_field` | string | ❌ | `null` | Data field to use for output filenames. If null, files are numbered `0001.pdf`, `0002.pdf`, etc. |
+| `timeout_seconds` | integer | ❌ | `300` | Maximum seconds to wait for merge completion. Max: 600. |
 
 **Response (200):**
 
@@ -354,6 +355,53 @@ If some fields in the template don't have corresponding data columns, the merge 
 - Concurrent requests are queued and processed sequentially
 - The queue depth is limited to **10 requests** — additional requests receive `429 Too Many Requests`
 - Each operation has a configurable timeout (default 120 seconds)
+
+---
+
+## Timeout Behaviour
+
+- **Default timeout:** `POST /mail_merge` defaults to 300 seconds per request.
+- **Configurable:** Set `timeout_seconds` in the request body (integer, 1–600). Values outside this range are rejected with `INVALID_REQUEST`.
+- **`POST /convert`** does not accept `timeout_seconds`; it has a fixed 120-second limit.
+- When a timeout occurs the service returns HTTP 504 with code `TIMEOUT`. LibreOffice is restarted automatically after a timeout.
+
+---
+
+## Retry Guidance
+
+Clients should apply exponential backoff when the service returns **503**:
+
+| Attempt | Wait before retry |
+|---------|------------------|
+| 1st retry | 1 second |
+| 2nd retry | 2 seconds |
+| 3rd retry | 4 seconds |
+| Give up | — |
+
+A 503 means LibreOffice is unavailable or restarting. Three retries with exponential backoff (1 s, 2 s, 4 s) are recommended; do not retry 4xx or 504 responses.
+
+---
+
+## Field Validation Constraints
+
+| Constraint | Limit |
+|-----------|-------|
+| Max template file size | 50 MB |
+| Max data records per `/mail_merge` request | 1,000 |
+| Max field name length | 64 characters |
+| Max request body size | 10 MB |
+| Max response body size | Unbounded (paths only; files are on the shared volume) |
+
+Requests exceeding these limits receive HTTP 400 with code `INVALID_REQUEST`.
+
+---
+
+## Size Limits
+
+- **Request payload:** Max 10 MB (enforced by FastAPI/uvicorn). Exceeds this → HTTP 413.
+- **Template files:** Max 50 MB. Checked before opening in LibreOffice; exceeds → `INVALID_REQUEST`.
+- **Data array:** Max 1,000 records per merge. Exceeds → `INVALID_REQUEST`.
+- **Output files:** No limit imposed by the service; limited only by available disk on the shared volume.
 
 ---
 
