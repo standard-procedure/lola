@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  lola-service:
+    build:
+      context: ./lola-service
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./documents:/documents
+    environment:
+      - LO_PORT=2002
+      - API_PORT=8080
+      - LOG_LEVEL=info
+      - MAX_MERGE_TIMEOUT=120
+      - DOCUMENTS_PATH=/documents
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
