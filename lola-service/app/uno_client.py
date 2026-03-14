@@ -84,3 +84,47 @@ class UnoClient:
                 except Exception as retry_error:
                     logger.error(f"UNO retry also failed: {retry_error}")
                     raise
+
+    def convert_to_pdf(self, input_path: str, output_path: str, save_filter: str = "writer_pdf_Export") -> None:
+        """
+        Convert a document to the specified format using LibreOffice UNO.
+
+        Args:
+            input_path: Absolute filesystem path to the source document.
+            output_path: Absolute filesystem path for the output file.
+            save_filter: LibreOffice export filter name (default: writer_pdf_Export).
+        """
+        import uno
+        from com.sun.star.beans import PropertyValue
+
+        def _do(client):
+            desktop = client.smgr.createInstanceWithContext(
+                "com.sun.star.frame.Desktop", client.ctx
+            )
+
+            # Open document hidden
+            hidden_prop = PropertyValue()
+            hidden_prop.Name = "Hidden"
+            hidden_prop.Value = True
+
+            doc = desktop.loadComponentFromURL(
+                uno.systemPathToFileUrl(input_path),
+                "_blank",
+                0,
+                (hidden_prop,),
+            )
+
+            try:
+                # Export with specified filter
+                filter_prop = PropertyValue()
+                filter_prop.Name = "FilterName"
+                filter_prop.Value = save_filter
+
+                doc.storeToURL(
+                    uno.systemPathToFileUrl(output_path),
+                    (filter_prop,),
+                )
+            finally:
+                doc.close(True)
+
+        self.execute_with_lock(_do)
