@@ -20,6 +20,33 @@ Ruby App / Rails
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
 
+## Font Support
+
+Lola's Docker image includes a comprehensive set of fonts for real-world Word template compatibility:
+
+| Font package | Covers |
+|---|---|
+| `ttf-mscorefonts-installer` | Arial, Verdana, Georgia, Courier New, Times New Roman, and other Microsoft core fonts |
+| `fonts-crosextra-carlito` | **Calibri** (metric-compatible replacement — Word's default font since 2007) |
+| `fonts-crosextra-caladea` | **Cambria** (metric-compatible replacement — common Word heading font) |
+| `fonts-liberation` | Arial, Times New Roman, Courier New (metric-compatible replacements) |
+| `fonts-dejavu-core` | General-purpose coverage |
+
+This means most real-world Word templates will produce correctly laid-out PDFs without font substitution artifacts.
+
+### Custom fonts
+
+If your templates use branded or custom fonts, mount them at `/fonts`:
+
+```yaml
+# docker-compose.yml
+volumes:
+  - ./documents:/documents
+  - ./fonts:/fonts:ro   # drop .ttf/.otf files here
+```
+
+Custom fonts are automatically picked up and registered when the container starts.
+
 ## Quick Start
 
 ### 1. Start the service
