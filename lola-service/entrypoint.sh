@@ -5,6 +5,15 @@ export LO_PORT=${LO_PORT:-2002}
 export API_PORT=${API_PORT:-8080}
 export LOG_LEVEL=${LOG_LEVEL:-info}
 
+# Refresh font cache if custom fonts have been mounted at /fonts
+if [ -d /fonts ] && [ "$(ls -A /fonts 2>/dev/null)" ]; then
+    echo "Custom fonts detected in /fonts — copying and refreshing font cache..."
+    cp /fonts/*.ttf /usr/local/share/fonts/ 2>/dev/null || true
+    cp /fonts/*.otf /usr/local/share/fonts/ 2>/dev/null || true
+    fc-cache -f -v > /dev/null 2>&1
+    echo "Font cache refreshed."
+fi
+
 echo "Starting LibreOffice via supervisord on UNO port ${LO_PORT}..."
 
 # Start supervisord in background (manages LibreOffice process)

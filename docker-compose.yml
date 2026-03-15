@@ -9,6 +9,8 @@ services:
       - "8080:8080"
     volumes:
       - ./documents:/documents
+      # Optional: mount custom fonts (TTF/OTF) here and they'll be loaded at startup
+      # - ./fonts:/fonts:ro
     environment:
       - LO_PORT=2002
       - API_PORT=8080
